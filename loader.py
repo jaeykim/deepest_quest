@@ -42,56 +42,59 @@ def load_data(filepath):
 
     # return train_files
 
-def load_sep_data(df_animals, train_list, test_list, animal_set, dir, valid_set=10, augmentation=False, batch_size=100, num_workers=10, ssl=False, ssl_dir=None, animal_list=None, labels=None, sslExist=False, filename='default'):
-    # divide the train data into train / valf
-    df_animals['train_val_test'] = -1
-
-    df_animals.loc[df_animals['file_path'].isin(train_list), 'train_val_test'] = 0
-    df_animals.loc[df_animals['file_path'].isin(test_list), 'train_val_test'] = 2
+def load_sep_data(df_animals, train_list, test_list, animal_set, dir, valid_set=10, augmentation=False, batch_size=100, num_workers=10, ssl=False, animal_list=None, labels=None, filename='default'):
 
     # move accurate test sets to the train sets
-    print('ssl: {}, animal_list: {}, sslExist: {}'.format(ssl, animal_list, sslExist))
+    # print('ssl: {}, animal_list: {}, sslExist: {}'.format(ssl, animal_list, sslExist))
+    print('ssl: {}, animal_list: {}'.format(ssl, animal_list))
     if ssl:
-        test_df_animals = df_animals.copy()
-        if sslExist:
-            print('semi-supervised learning load segmented data')
-            files = [f for f in glob(ssl_dir + "**/**", recursive=True)] # create a list will allabsolute path of all files
-            df_animals = pd.DataFrame({"file_path":files}) # transform in a dataframe
-            df_animals['animal'] = df_animals['file_path'].str.extract('oregon_wildlife/{}/(.+)/'.format(filename)) # extract the name of the animal
-            df_animals['file'] = df_animals['file_path'].str.extract('{}/.+/(.+)'.format(filename)) # extrat the file name
-            df_animals = df_animals.dropna() # drop nas
-            df_animals['train_val_test'] = 0
-        else:
-            print('semi-supervised learning data segmentation')
-            print(animal_list)
-
-            n = 0
-            for i, row in df_animals.iterrows():
-                if row['train_val_test'] == 0:
-                    os.system('ln -s {} {}/{}'.format(row['file_path'], ssl_dir, row['animal']))
-                elif row['train_val_test'] == 2:
-                    if labels[n] > -1:
-                        os.system('ln -s {} {}/{}'.format(row['file_path'], ssl_dir, animal_list[labels[n]]))
-                        df_animals.loc[i, 'train_val_test'] = 0
-                        df_animals.loc[i, 'file_path'] = '{}/{}/{}'.format(ssl_dir, row['animal'], row['file'])
-                    n = n + 1
-    
-    print('parsed df_animals:')
-    print(df_animals)
+        # if sslExist:
+        #     print('semi-supervised learning load segmented data')
+        #     files = [f for f in glob(ssl_dir + "**/**", recursive=True)] # create a list will allabsolute path of all files
+        #     train_df_animals = pd.DataFrame({"file_path":files}) # transform in a dataframe
+        #     train_df_animals['animal'] = train_df_animals['file_path'].str.extract('oregon_wildlife/{}/(.+)/'.format(filename)) # extract the name of the animal
+        #     train_df_animals['file'] = train_df_animals['file_path'].str.extract('{}/.+/(.+)'.format(filename)) # extrat the file name
+        #     train_df_animals = train_df_animals.dropna() # drop nas
+        #     train_df_animals['train_val_test'] = 0
+        #     print('################ new data: {}'.format(len(train_df_animals.index)))
+            
+        print('semi-supervised learning data segmentation')
+        # print(animal_list)
+        # train_df_animals = df_animals.copy()
+        df_animals['ssl'] = -1
+        df_animals['ssl_animal'] = ''
+        n = 0
+        for i, row in df_animals.iterrows():
+            if row['train_val_test'] > -1 and row['train_val_test'] < 2:
+                # os.system('ln -s {} {}/{}'.format(row['file_path'], ssl_dir, row['animal']))
+                df_animals.loc[i, 'ssl'] = 0
+            elif row['train_val_test'] == 2:
+                if labels[n] > -1:
+                    # os.system('ln -s {} {}/{}'.format(row['file_path'], ssl_dir, animal_list[labels[n]]))
+                    # train_df_animals.at[i, 'train_val_test'] = 0
+                    # train_df_animals.at[i, 'file_path'] = '{}/{}/{}'.format(ssl_dir, row['animal'], row['file'])
+                    df_animals.loc[i, 'ssl'] = 0
+                    df_animals.loc[i, 'ssl_animal'] = animal_list[labels[n]]
+                n = n + 1
 
     # separate train / valid sets
     train_val_test_list = [0,1]
     train_val_weights = [100 - valid_set, valid_set]
     
+    if ssl:
+        for an in animal_set:
+            n = sum((df_animals['ssl'] == 0) & (df_animals['animal'] == an)) # count the number of images of each animal
+            train_val_test = random.choices(train_val_test_list, weights= train_val_weights,  k=n)
+            df_animals.loc[(df_animals['ssl'] == 0) & (df_animals['animal'] == an), 'ssl'] = train_val_test
+        # print('updated df_animals for ssl:')
+        # print(df_animals)
+   
     for an in animal_set:
         n = sum((df_animals['train_val_test'] == 0) & (df_animals['animal'] == an)) # count the number of images of each animal
         train_val_test = random.choices(train_val_test_list, weights= train_val_weights,  k=n)
         df_animals.loc[(df_animals['train_val_test'] == 0) & (df_animals['animal'] == an), 'train_val_test'] = train_val_test
+    print('df_animals:')
     print(df_animals)
-
-    if ssl:
-        print('updated df_animals for ssl:')
-        print(df_animals)
 
     # transform the train/valid data with augmentation
     transform = {
@@ -133,14 +136,17 @@ def load_sep_data(df_animals, train_list, test_list, animal_set, dir, valid_set=
     def check_test(path):
         return (df_animals[df_animals['file_path'] == path].train_val_test == 2).bool()
     
-    def check_ssl_test(path):
-        return (test_df_animals[test_df_animals['file_path'] == path].train_val_test == 2).bool()
+    def ssl_check_train(path):
+        return (df_animals[df_animals['file_path'] == path].ssl == 0).bool()
+
+    def ssl_check_valid(path):
+        return (df_animals[df_animals['file_path'] == path].ssl == 1).bool()
 
     if ssl:
         image_datasets = {
-            'train' : ImageFolder(root=ssl_dir, transform=transform['train'], is_valid_file=check_train),
-            'valid' : ImageFolder(root=ssl_dir, transform=transform['valid'], is_valid_file=check_valid),
-            'test' : ImageFolder(root=dir, transform=transform['test'], is_valid_file=check_ssl_test),
+            'train' : ImageFolder(root=dir, transform=transform['train'], is_valid_file=ssl_check_train),
+            'valid' : ImageFolder(root=dir, transform=transform['valid'], is_valid_file=ssl_check_valid),
+            'test' : ImageFolder(root=dir, transform=transform['test'], is_valid_file=check_test),
         }
     else:
         image_datasets = {

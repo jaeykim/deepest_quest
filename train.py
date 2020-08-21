@@ -166,7 +166,7 @@ def inference(loaders, model, criterion, ssl_threshold, use_cuda):
         preds = output.data.max(1, keepdim=True)[1].cpu().numpy().flatten()
         # print(values)
         # print(labels)
-        preds[values < ssl_threshold] = -1
+        preds[values < np.mean(values)] = -1
         # print(labels)
 
         # preds = output.data.max(1, keepdim=False)[1].cpu().numpy()
@@ -339,7 +339,7 @@ def ensemble_inference(loaders, en_models, n_ensemble, criterion, ssl_threshold,
         preds = output.data.max(1, keepdim=True)[1].cpu().numpy().flatten()
         # print(values)
         # print(labels)
-        preds[values < ssl_threshold] = -1
+        preds[values < np.mean(values)] = -1
         # print(labels)
 
         # preds = output.data.max(1, keepdim=False)[1].cpu().numpy()

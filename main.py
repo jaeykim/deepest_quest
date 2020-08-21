@@ -25,6 +25,8 @@ import argparse
 
 ''' arg parser '''
 parser = argparse.ArgumentParser(description='Wildlife DNN model.')
+parser.add_argument('--epochs', required=False, default=200, type=int,
+                    help='set an epoch (defualt: 200)')
 parser.add_argument('--optimizer', required=False, default='sgd',
                     help='select an optimizer (defualt: sgd)')
 parser.add_argument('--batch_size', required=False, default=100, type=int,
@@ -48,6 +50,7 @@ parser.add_argument('--debug', required=False, default=False,
 
 def main(argv):
     args = parser.parse_args()
+    n_epoch = args.epochs
     optimz = args.optimizer
     batch_size = args.batch_size
     augmentation = args.augmentation
@@ -87,6 +90,12 @@ def main(argv):
     test_list = [PATH + s for s in load_data('./deepest_test.txt')]
 
     print('train list: {}, test list: {}'.format(len(train_list), len(test_list)))
+
+    # divide the train data into train / valf
+    df_animals['train_val_test'] = -1
+
+    df_animals.loc[df_animals['file_path'].isin(train_list), 'train_val_test'] = 0
+    df_animals.loc[df_animals['file_path'].isin(test_list), 'train_val_test'] = 2
     # print(df_animals)
 
     if ensemble:
@@ -124,7 +133,6 @@ def main(argv):
         print('-' * 100)
 
     # set epochs
-    n_epoch = 200
     start_epoch = 1
 
     # specify optimizer
@@ -188,17 +196,18 @@ def main(argv):
         if ssl:
             print('+' * 100)
             print('start semi-supervised learning')
-            ssl_dir = PATH + 'oregon_wildlife/{}'.format(filename)
-            sslExist = os.path.isdir(ssl_dir)
+            # ssl_dir = PATH + 'oregon_wildlife/{}'.format(filename)
+            # sslExist = os.path.isdir(ssl_dir)
 
-            labels = None
-            if not sslExist:
-                os.mkdir(ssl_dir)
-                for an in animal_set:
-                    os.system('mkdir {}/{}'.format(ssl_dir, an))
+            # labels = None
+            # if not sslExist:
+            #     os.mkdir(ssl_dir)
+            #     for an in animal_set:
+            #         os.system('mkdir {}/{}'.format(ssl_dir, an))
 
-                labels = ensemble_inference(loaders, en_models, n_ensemble, criterion, ssl_threshold, use_cuda)
-                print('################ new data: {}'.format(len(labels)))
+            #     labels = ensemble_inference(loaders, en_models, n_ensemble, criterion, ssl_threshold, use_cuda)
+            #     print('################ new data: {}'.format(len(np.where(labels > -1)[0])))
+            labels = ensemble_inference(loaders, en_models, n_ensemble, criterion, ssl_threshold, use_cuda)
 
             en_loaders = []
             for i in range(n_ensemble):
@@ -209,30 +218,32 @@ def main(argv):
                                     dir=dir,
                                     augmentation=augmentation,
                                     ssl=True,
-                                    ssl_dir=ssl_dir,
+                                    # ssl_dir=ssl_dir,
                                     animal_list=animal_list,
                                     labels=labels,
-                                    sslExist=sslExist,
+                                    # sslExist=sslExist,
                                     filename=filename)
                 en_loaders.append(loaders)
+                # sslExist = True
 
             # train the model
             en_models = ensemble_train(n_epoch, start_epoch, en_loaders, en_models, en_optimizers, n_ensemble, criterion, use_cuda, filename, debug)
     else:
         # semi-supervised learning
         if ssl:
-            ssl_dir = PATH + 'oregon_wildlife/{}'.format(filename)
-            sslExist = os.path.isdir(ssl_dir)
+            # ssl_dir = PATH + 'oregon_wildlife/{}'.format(filename)
+            # sslExist = os.path.isdir(ssl_dir)
 
-            if not sslExist:
-                os.mkdir(ssl_dir)
-                for an in animal_set:
-                    os.system('mkdir {}/{}'.format(ssl_dir, an))
+            # if not sslExist:
+            #     os.mkdir(ssl_dir)
+            #     for an in animal_set:
+            #         os.system('mkdir {}/{}'.format(ssl_dir, an))
 
-            labels = None
-            if not sslExist:
-                labels = inference(loaders, model, criterion, ssl_threshold, use_cuda)
-                print('* new data: {}'.format(len(labels)))
+            # labels = None
+            # if not sslExist:
+            #     labels = inference(loaders, model, criterion, ssl_threshold, use_cuda)
+            #     print('################ new data: {}'.format(len(np.where(labels > -1)[0])))
+            labels = inference(loaders, model, criterion, ssl_threshold, use_cuda)
 
             (loaders, animal_list) = load_sep_data(df_animals=df_animals,
                                     train_list=train_list,
@@ -241,10 +252,10 @@ def main(argv):
                                     dir=dir,
                                     augmentation=augmentation,
                                     ssl=True,
-                                    ssl_dir=ssl_dir,
+                                    # ssl_dir=ssl_dir,
                                     animal_list=animal_list,
                                     labels=labels,
-                                    sslExist=sslExist,
+                                    # sslExist=sslExist,
                                     filename=filename)
 
             # train the model
