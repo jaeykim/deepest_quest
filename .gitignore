@@ -1,0 +1,7 @@
+data
+__pycache__
+model_*
+_model_*
+models/*
+results_*
+wildlife.h5
