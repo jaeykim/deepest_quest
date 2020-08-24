@@ -175,9 +175,9 @@ def main(argv):
     # load the existing model
     if ensemble:
         for i in range(n_ensemble):
-            (loaded, model, optimizer, start_epoch) = load_model('model_{}_{}.pt'.format(filename, i), model, en_optimizers[i])
+            (loaded, model, optimizer, start_epoch) = load_model('model_{}_{}.pt'.format(filename, i), en_models[i], en_optimizers[i])
             if not loaded and ssl:
-                (loaded, model, optimizer, start_epoch) = load_model('model_{}_{}.pt'.format(casename, i), model, en_optimizers[i])
+                (loaded, model, optimizer, start_epoch) = load_model('model_{}_{}.pt'.format(casename, i), en_models[i], en_optimizers[i])
                 # _model = train(n_epoch, start_epoch, loaders, _model, _optimizer, criterion, use_cuda, casename, debug)
             en_models[i] = model
             en_optimizers[i] = optimizer
